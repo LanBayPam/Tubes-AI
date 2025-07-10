@@ -1,0 +1,23 @@
+{
+  "model_name": "Fire Detection Model",
+  "input_shape": [
+    1,
+    224,
+    224,
+    3
+  ],
+  "output_shape": [
+    1,
+    1
+  ],
+  "input_type": "float32",
+  "output_type": "float32",
+  "classes": [
+    "No Fire",
+    "Fire"
+  ],
+  "threshold": 0.5,
+  "preprocessing": "Normalize to [0, 1] range",
+  "validation_accuracy": 0.9350000023841858,
+  "model_size_mb": 2.5491485595703125
+}
