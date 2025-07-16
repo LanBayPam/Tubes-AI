@@ -22,7 +22,6 @@ class _FireDetectionScreenState extends State<FireDetectionScreen> {
   bool _isDetecting = false;
   FireDetectionResult? _lastResult;
   String? _errorMessage;
-  bool _realTimeMode = false;
   File? _selectedImage;
   
   @override
@@ -174,29 +173,6 @@ class _FireDetectionScreenState extends State<FireDetectionScreen> {
     });
   }
   
-  void _toggleRealTimeMode() {
-    setState(() {
-      _realTimeMode = !_realTimeMode;
-    });
-    
-    if (_realTimeMode) {
-      _startRealTimeDetection();
-    } else {
-      _stopRealTimeDetection();
-    }
-  }
-  
-  void _startRealTimeDetection() {
-    // Note: Real-time detection would require converting CameraImage to bytes
-    // This is a simplified implementation - you might need to optimize for performance
-    print('Real-time detection started');
-  }
-  
-  void _stopRealTimeDetection() {
-    _cameraService.stopImageStream();
-    print('Real-time detection stopped');
-  }
-  
   void _showFireAlert(FireDetectionResult result) {
     showDialog(
       context: context,
@@ -293,11 +269,6 @@ class _FireDetectionScreenState extends State<FireDetectionScreen> {
             icon: const Icon(Icons.photo_library),
             onPressed: _selectImageFromGallery,
             tooltip: 'Select from Gallery',
-          ),
-          IconButton(
-            icon: Icon(_realTimeMode ? Icons.pause : Icons.play_arrow),
-            onPressed: _toggleRealTimeMode,
-            tooltip: _realTimeMode ? 'Stop Real-time' : 'Start Real-time',
           ),
           IconButton(
             icon: const Icon(Icons.flash_on),
