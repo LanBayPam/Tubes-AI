@@ -13,7 +13,7 @@ class FireDetectionScreen extends StatefulWidget {
   State<FireDetectionScreen> createState() => _FireDetectionScreenState();
 }
 
-class _FireDetectionScreenState extends State<FireDetectionScreen> {
+class _FireDetectionScreenState extends State<FireDetectionScreen> with TickerProviderStateMixin {
   final CameraService _cameraService = CameraService();
   final FireDetectionService _fireService = FireDetectionService();
   final ImagePicker _imagePicker = ImagePicker();
@@ -24,9 +24,27 @@ class _FireDetectionScreenState extends State<FireDetectionScreen> {
   String? _errorMessage;
   File? _selectedImage;
   
+  late AnimationController _scanAnimationController;
+  late Animation<double> _scanAnimation;
+  
   @override
   void initState() {
     super.initState();
+    
+    // Initialize scan animation
+    _scanAnimationController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    
+    _scanAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _scanAnimationController,
+      curve: Curves.easeInOut,
+    ));
+    
     _initializeServices();
   }
   
@@ -62,6 +80,9 @@ class _FireDetectionScreenState extends State<FireDetectionScreen> {
       _errorMessage = null;
     });
     
+    // Start scan animation
+    _scanAnimationController.forward();
+    
     try {
       // Capture image
       final imageBytes = await _cameraService.captureImage();
@@ -74,6 +95,9 @@ class _FireDetectionScreenState extends State<FireDetectionScreen> {
         _isDetecting = false;
       });
       
+      // Reset scan animation
+      _scanAnimationController.reset();
+      
       // Show alert if fire is detected
       if (result.isFire) {
         _showFireAlert(result);
@@ -83,6 +107,7 @@ class _FireDetectionScreenState extends State<FireDetectionScreen> {
         _isDetecting = false;
         _errorMessage = e.toString();
       });
+      _scanAnimationController.reset();
     }
   }
   
@@ -217,6 +242,7 @@ class _FireDetectionScreenState extends State<FireDetectionScreen> {
   
   @override
   void dispose() {
+    _scanAnimationController.dispose();
     _cameraService.dispose();
     _fireService.dispose();
     super.dispose();
@@ -261,17 +287,23 @@ class _FireDetectionScreenState extends State<FireDetectionScreen> {
     }
     
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('🔥 Fire Detection'),
-        backgroundColor: Colors.orange,
+        backgroundColor: Colors.black.withOpacity(0.3),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.photo_library),
+            icon: const Icon(Icons.photo_library, color: Colors.white),
             onPressed: _selectImageFromGallery,
             tooltip: 'Select from Gallery',
           ),
           IconButton(
-            icon: const Icon(Icons.flash_on),
+            icon: const Icon(Icons.flash_on, color: Colors.white),
             onPressed: _cameraService.toggleFlash,
             tooltip: 'Toggle Flash',
           ),
@@ -309,45 +341,79 @@ class _FireDetectionScreenState extends State<FireDetectionScreen> {
           // Detection Results Overlay
           if (_lastResult != null)
             Positioned(
-              top: 16,
+              top: 100,
               left: 16,
               right: 16,
-              child: Container(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: _lastResult!.isFire ? Colors.red[100] : Colors.green[100],
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: _lastResult!.isFire ? Colors.red : Colors.green,
                     width: 2,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_lastResult!.isFire ? Colors.red : Colors.green).withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
                 ),
                 child: Column(
                   children: [
                     Row(
                       children: [
-                        Icon(
-                          _lastResult!.isFire ? Icons.local_fire_department : Icons.check_circle,
-                          color: _lastResult!.isFire ? Colors.red : Colors.green,
-                          size: 32,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _lastResult!.isFire ? 'FIRE DETECTED' : 'NO FIRE',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
                             color: _lastResult!.isFire ? Colors.red : Colors.green,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            _lastResult!.isFire ? Icons.local_fire_department : Icons.check_circle,
+                            color: Colors.white,
+                            size: 24,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Confidence: ${_lastResult!.confidencePercentage.toStringAsFixed(1)}%'),
-                        Text('Risk: ${_lastResult!.riskLevel}'),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _lastResult!.isFire ? 'FIRE DETECTED' : 'NO FIRE',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: _lastResult!.isFire ? Colors.red : Colors.green,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Confidence: ${_lastResult!.confidencePercentage.toStringAsFixed(1)}%',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: (_lastResult!.isFire ? Colors.red : Colors.green).shade700,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Text(
+                                    'Risk: ${_lastResult!.riskLevel}',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: (_lastResult!.isFire ? Colors.red : Colors.green).shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -355,7 +421,40 @@ class _FireDetectionScreenState extends State<FireDetectionScreen> {
               ),
             ),
           
-          // Error Message
+          // Scanning animation overlay
+          if (_isDetecting)
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _scanAnimation,
+                builder: (context, child) {
+                  return Container(
+                    color: Colors.black.withOpacity(0.3),
+                    child: CustomPaint(
+                      painter: ScanLinePainter(_scanAnimation.value),
+                      size: Size.infinite,
+                    ),
+                  );
+                },
+              ),
+            ),
+          
+          // Scanning animation overlay
+          if (_isDetecting)
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _scanAnimation,
+                builder: (context, child) {
+                  return Container(
+                    color: Colors.black.withOpacity(0.3),
+                    child: CustomPaint(
+                      painter: ScanLinePainter(_scanAnimation.value),
+                      size: Size.infinite,
+                    ),
+                  );
+                },
+              ),
+            ),
+          
           if (_errorMessage != null)
             Positioned(
               bottom: 100,
@@ -377,31 +476,96 @@ class _FireDetectionScreenState extends State<FireDetectionScreen> {
         ],
       ),
       floatingActionButton: _selectedImage == null 
-        ? FloatingActionButton.large(
-            onPressed: _isDetecting ? null : _captureAndDetect,
-            backgroundColor: _isDetecting ? Colors.grey : Colors.orange,
-            child: _isDetecting 
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Icon(Icons.camera_alt, size: 32),
+        ? Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.orange.withOpacity(0.5),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: FloatingActionButton.large(
+              onPressed: _isDetecting ? null : _captureAndDetect,
+              backgroundColor: _isDetecting ? Colors.grey : Colors.orange,
+              child: _isDetecting 
+                  ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 3)
+                  : const Icon(Icons.camera_alt, size: 32, color: Colors.white),
+            ),
           )
-        : FloatingActionButton.extended(
-            onPressed: _isDetecting ? null : () async {
-              if (_selectedImage != null) {
-                final bytes = await _selectedImage!.readAsBytes();
-                _analyzeSelectedImage(bytes);
-              }
-            },
-            backgroundColor: _isDetecting ? Colors.grey : Colors.orange,
-            icon: _isDetecting 
-                ? const SizedBox(
-                    width: 20, 
-                    height: 20, 
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                  )
-                : const Icon(Icons.search),
-            label: Text(_isDetecting ? 'Analyzing...' : 'Analyze Image'),
+        : Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.orange.withOpacity(0.5),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: FloatingActionButton.extended(
+              onPressed: _isDetecting ? null : () async {
+                if (_selectedImage != null) {
+                  final bytes = await _selectedImage!.readAsBytes();
+                  _analyzeSelectedImage(bytes);
+                }
+              },
+              backgroundColor: _isDetecting ? Colors.grey : Colors.orange,
+              icon: _isDetecting 
+                  ? const SizedBox(
+                      width: 20, 
+                      height: 20, 
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                    )
+                  : const Icon(Icons.search, color: Colors.white),
+              label: Text(
+                _isDetecting ? 'Analyzing...' : 'Analyze Image',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
           ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
+}
+
+class ScanLinePainter extends CustomPainter {
+  final double progress;
+  
+  ScanLinePainter(this.progress);
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.orange
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+    
+    final glowPaint = Paint()
+      ..color = Colors.orange.withOpacity(0.3)
+      ..strokeWidth = 8
+      ..style = PaintingStyle.stroke;
+    
+    final y = size.height * progress;
+    
+    // Draw glow effect
+    canvas.drawLine(
+      Offset(0, y),
+      Offset(size.width, y),
+      glowPaint,
+    );
+    
+    // Draw scan line
+    canvas.drawLine(
+      Offset(0, y),
+      Offset(size.width, y),
+      paint,
+    );
+  }
+  
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
